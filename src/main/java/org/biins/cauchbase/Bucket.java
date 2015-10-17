@@ -2,14 +2,17 @@ package org.biins.cauchbase;
 
 import com.couchbase.cbadmin.assets.Bucket.BucketType;
 
+import java.lang.annotation.*;
+
 /**
  * @author Martin Janys
  */
+@Target({ElementType.TYPE})
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
 public @interface Bucket {
 
     String name();
-
-    String password() default "";
 
     BucketType bucketType() default BucketType.MEMCACHED;
 

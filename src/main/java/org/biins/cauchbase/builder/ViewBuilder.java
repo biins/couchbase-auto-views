@@ -2,7 +2,6 @@ package org.biins.cauchbase.builder;
 
 import com.couchbase.cbadmin.client.ViewConfig;
 import com.couchbase.cbadmin.client.ViewConfigBuilder;
-import com.couchbase.cbadmin.client.ViewConfigBuilderFactory;
 import org.biins.cauchbase.View;
 
 import java.io.BufferedReader;
@@ -16,18 +15,17 @@ public class ViewBuilder {
 
     private static final String CLASS_PATH_PREFIX = "classpath:";
 
-    private final ViewConfigBuilderFactory configBuilderFactory;
-
-    public ViewBuilder(ViewConfigBuilderFactory configBuilderFactory) {
-        this.configBuilderFactory = configBuilderFactory;
-    }
 
     public ViewConfig build(View view) {
-        ViewConfigBuilder configBuilder = configBuilderFactory.create(
+        ViewConfigBuilder configBuilder = new ViewConfigBuilder(
                 view.design(),
-                !view.bucket().isEmpty() ? view.bucket() : null,
-                !view.bucketPassword().isEmpty() ? view.bucketPassword() : null);
+                !view.bucket().isEmpty() ? view.bucket() : null);
 
+        return configBuilder.build();
+    }
+    public ViewConfig build(View view, String designName, String bucketName, String password) {
+        ViewConfigBuilder configBuilder = new ViewConfigBuilder(designName, bucketName);
+        configBuilder.password(password);
         return configBuilder
                 .view(view.name(), resolveFunction(view.map()), resolveFunction(!view.reduce().isEmpty() ? view.reduce() : null))
                 .build();

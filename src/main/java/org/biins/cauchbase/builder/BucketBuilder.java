@@ -9,10 +9,14 @@ import org.biins.cauchbase.Bucket;
 public class BucketBuilder {
 
     public BucketConfig build(Bucket bucket) {
+        return build(bucket, null);
+    }
+
+    public BucketConfig build(Bucket bucket, String password) {
         BucketConfig bucketConfig = new BucketConfig(bucket.name());
 
-        if (!bucket.password().isEmpty()) {
-            bucketConfig.setSaslPassword(bucket.password());
+        if (password != null) {
+            bucketConfig.setSaslPassword(password);
         }
 
         bucketConfig.bucketType = bucket.bucketType();
