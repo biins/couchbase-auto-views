@@ -19,7 +19,7 @@ public class BucketBuilder {
             bucketConfig.setSaslPassword(password);
         }
 
-        bucketConfig.bucketType = bucket.bucketType();
+        bucketConfig.bucketType = bucket.type();
         bucketConfig.ramQuotaMB = bucket.ramQuotaMB();
         bucketConfig.replicaCount = bucket.replicaCount();
         bucketConfig.shouldIndexReplicas = bucket.shouldIndexReplicas();

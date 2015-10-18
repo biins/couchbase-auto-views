@@ -5,6 +5,7 @@ import com.couchbase.cbadmin.client.ViewConfigBuilder;
 import org.biins.cauchbase.View;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
@@ -27,13 +28,13 @@ public class ViewBuilder {
         ViewConfigBuilder configBuilder = new ViewConfigBuilder(designName, bucketName);
         configBuilder.password(password);
         return configBuilder
-                .view(view.name(), resolveFunction(view.map()), resolveFunction(!view.reduce().isEmpty() ? view.reduce() : null))
+                .view(view.name(), resolveFunction(view.map()), !view.reduce().isEmpty() ? resolveFunction(view.reduce()) : null)
                 .build();
     }
 
     private String resolveFunction(String func) {
         if (func.startsWith(CLASS_PATH_PREFIX)) {
-            return readClassPathResource(func.substring(CLASS_PATH_PREFIX.length()));
+            return readClassPathResource(func);
         }
         else {
             return func;
@@ -42,17 +43,28 @@ public class ViewBuilder {
 
     private String readClassPathResource(String path) {
         StringBuilder sb = new StringBuilder();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(ClassLoader.getSystemResourceAsStream(path)));
+        BufferedReader reader = new BufferedReader(new InputStreamReader(ClassLoader.getSystemResourceAsStream(parseClasspathPath(path))));
+        String lineSeparator = String.format("%n");
         String line;
         try {
             while ((line = reader.readLine()) != null) {
-                sb.append(line);
+                sb.append(line).append(lineSeparator);
             }
         }
         catch (IOException e) {
             throw new RuntimeException(e);
         }
         return sb.toString();
+    }
+
+    private String parseClasspathPath(String path) {
+        String prefix = CLASS_PATH_PREFIX + "/";
+        if (!path.startsWith(prefix)) {
+            throw new IllegalArgumentException("Set absolute classpath path starts with '/'. For example classpath:/path/to/script.js");
+        }
+        else {
+            return path.substring(prefix.length());
+        }
     }
 
 }

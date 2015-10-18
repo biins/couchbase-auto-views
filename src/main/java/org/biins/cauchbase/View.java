@@ -5,7 +5,7 @@ import java.lang.annotation.*;
 /**
  * @author Martin Janys
  */
-@Target({ElementType.TYPE})
+@Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface View {

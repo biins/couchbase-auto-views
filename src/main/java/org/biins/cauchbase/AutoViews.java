@@ -14,9 +14,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import static org.biins.cauchbase.AnnotationUtils.annotationsByType;
-import static org.biins.cauchbase.AnnotationUtils.annotationsByTypes;
-import static org.biins.cauchbase.AnnotationUtils.get;
+import static org.biins.cauchbase.AnnotationUtils.*;
 
 /**
  * @author Martin Janys
@@ -25,30 +23,15 @@ public class AutoViews {
 
     private final CouchbaseAdmin client;
 
-    private String designName;
-    private Map<String, String> bucketPasswords;
-    private String admin;
-    private String adminPassword;
+    private Map<String, String> bucketPasswords = Collections.emptyMap();
     private long pollTimeout = 5000;
 
     public AutoViews(CouchbaseAdmin client) {
         this.client = client;
     }
 
-    public void setDesignName(String designName) {
-        this.designName = designName;
-    }
-
     public void setBucketPasswords(Map<String, String> bucketPasswords) {
         this.bucketPasswords = bucketPasswords;
-    }
-
-    public void setAdmin(String admin) {
-        this.admin = admin;
-    }
-
-    public void setAdminPassword(String adminPassword) {
-        this.adminPassword = adminPassword;
     }
 
     public void setPollTimeout(long pollTimeout) {
@@ -61,19 +44,22 @@ public class AutoViews {
     }
 
     public void setup(Class<?> cls) {
-        String rootBucket = setupClass(cls, bucketPasswords, admin, adminPassword);
+        Bucket rootBucket = setupClass(cls);
         setupMethods(cls.getMethods(), rootBucket);
     }
 
-    private String setupClass(Class<?> cls, Map<String, String> bucketPasswords, String admin, String adminPassword) {
+    private Bucket setupClass(Class<?> cls) {
         Map<Class<?>, List<Annotation>> annotations = annotationsByTypes(cls.getAnnotations());
 
-        List<Bucket> bucket = get(annotations, Bucket.class);
-        List<View> view = get(annotations, View.class);
+        List<Bucket> buckets = get(annotations, Bucket.class);
+        if (buckets == null || buckets.size() != 1) {
+            throw new IllegalStateException("One bucket must be defined");
+        }
+        Bucket rootBucket = buckets.get(0);
+        List<View> views = get(annotations, View.class);
 
-        List<BucketConfig> bucketConfigs = createBucketConfigs(bucket);
-        String rootBucket = bucketConfigs.size() == 1 ? bucket.get(0).name() : null;
-        List<ViewConfig> viewConfigs = createViewConfigs(view, rootBucket);
+        List<BucketConfig> bucketConfigs = createBucketConfigs(buckets);
+        List<ViewConfig> viewConfigs = createViewConfigs(views, rootBucket);
 
         createBuckets(bucketConfigs);
         createViews(viewConfigs);
@@ -82,7 +68,7 @@ public class AutoViews {
     }
 
     private List<BucketConfig> createBucketConfigs(List<Bucket> bucket) {
-        List<BucketConfig> bucketConfigs = new ArrayList<BucketConfig>();
+        List<BucketConfig> bucketConfigs = new ArrayList<>();
         if (bucket != null) {
             for (Bucket b : bucket) {
                 BucketBuilder bucketBuilder = new BucketBuilder();
@@ -94,8 +80,8 @@ public class AutoViews {
         return bucketConfigs;
     }
 
-    private List<ViewConfig> createViewConfigs(List<View> view, String rootBucket) {
-        List<ViewConfig> viewConfigs = new ArrayList<ViewConfig>();
+    private List<ViewConfig> createViewConfigs(List<View> view, Bucket rootBucket) {
+        List<ViewConfig> viewConfigs = new ArrayList<>();
         if (view != null) {
             for (View v : view) {
                 viewConfigs.add(createViewConfig(v, rootBucket));
@@ -104,29 +90,39 @@ public class AutoViews {
         return viewConfigs;
     }
 
-    private ViewConfig createViewConfig(View v, String rootBucket) {
+    private ViewConfig createViewConfig(View v, Bucket rootBucket) {
         String bucketName = resolveBucketName(v, rootBucket);
+        String designName = resolveDesignName(v, rootBucket);
         ViewBuilder viewBuilder = new ViewBuilder();
         return viewBuilder.build(v, designName, bucketName, bucketPasswords.get(bucketName));
     }
 
-    private String resolveBucketName(View v, String bucket) {
+    private String resolveDesignName(View v, Bucket bucket) {
+        if (!v.design().isEmpty()) {
+            return v.design();
+        }
+        else {
+            return bucket.design();
+        }
+    }
+
+    private String resolveBucketName(View v, Bucket bucket) {
         if (!v.bucket().isEmpty()) {
             return v.bucket();
         }
         else {
-            return bucket;
+            return bucket.name();
         }
     }
 
-    private void setupMethods(Method[] methods, String rootBucket) {
+    private void setupMethods(Method[] methods, Bucket rootBucket) {
         for (Method method : methods) {
             setupMethod(method, rootBucket);
         }
     }
 
-    private void setupMethod(Method method, String rootBucket) {
-        List<ViewConfig> viewConfigs = new ArrayList<ViewConfig>();
+    private void setupMethod(Method method, Bucket rootBucket) {
+        List<ViewConfig> viewConfigs = new ArrayList<>();
         List<View> views = annotationsByType(View.class, method.getAnnotations());
         for (View v : views) {
             ViewConfig viewConfig = createViewConfig(v, rootBucket);
@@ -139,7 +135,9 @@ public class AutoViews {
     public void createBuckets(List<BucketConfig> bucketConfigs) {
         for (BucketConfig bucketConfig : bucketConfigs) {
             try {
-                client.createBucket(bucketConfig);
+                if (!client.getBuckets().containsKey(bucketConfig.name)) {
+                    client.createBucket(bucketConfig);
+                }
             }
             catch (RestApiException e) {
                 throw new RuntimeException(e);

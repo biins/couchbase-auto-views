@@ -14,7 +14,9 @@ public @interface Bucket {
 
     String name();
 
-    BucketType bucketType() default BucketType.MEMCACHED;
+    String design();
+
+    BucketType type() default BucketType.MEMCACHED;
 
     int ramQuotaMB() default 100;
 
