@@ -24,7 +24,8 @@ public class AutoViews {
     private final CouchbaseAdmin client;
 
     private Map<String, String> bucketPasswords = Collections.emptyMap();
-    private long pollTimeout = 5000;
+    private long pollTimeout = -1;
+    private boolean developmentViews = false;
 
     public AutoViews(CouchbaseAdmin client) {
         this.client = client;
@@ -36,6 +37,10 @@ public class AutoViews {
 
     public void setPollTimeout(long pollTimeout) {
         this.pollTimeout = pollTimeout;
+    }
+
+    public void setDevelopmentViews(boolean developmentViews) {
+        this.developmentViews = developmentViews;
     }
 
     public void setup(Object object) {
@@ -99,10 +104,10 @@ public class AutoViews {
 
     private String resolveDesignName(View v, Bucket bucket) {
         if (!v.design().isEmpty()) {
-            return v.design();
+            return developmentViews ? "dev_" + v.design() : v.design();
         }
         else {
-            return bucket.design();
+            return developmentViews ? "dev_" + bucket.design() : bucket.design();
         }
     }
 

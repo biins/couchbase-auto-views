@@ -784,15 +784,18 @@ public class CouchbaseAdminImpl implements CouchbaseAdmin {
      */
     @Override
     public void defineView(ViewConfig config, long pollTimeout) throws RestApiException {
+        JsonObject views = getViews(config.getBucketName(), config.getDesign());
         // Format the URI
         StringBuilder ub = new StringBuilder()
-                .append('/').append(config.getBucketName())
+                .append('/').append("couchBase/").append(config.getBucketName())
                 .append("/_design/").append(config.getDesign());
 
         HttpPut req = new HttpPut();
         req.setHeader("Content-Type", "application/json");
         try {
-            req.setEntity(new StringEntity(config.getDefinition()));
+            JsonObject design = config.getDefinition();
+            design = mergeViews(views, design);
+            req.setEntity(new StringEntity(design.toString()));
         } catch (UnsupportedEncodingException ex) {
             throw new RestApiException(ex);
         }
@@ -841,6 +844,35 @@ public class CouchbaseAdminImpl implements CouchbaseAdmin {
                 }
             }
             throw new RestApiException("Timed out waiting for view");
+        }
+    }
+
+    private JsonObject mergeViews(JsonObject design, JsonObject definition) {
+        JsonObject views = definition.get("views").getAsJsonObject();
+        JsonObject currentViews = design.get("views").getAsJsonObject();
+        for (Entry<String, JsonElement> entry : currentViews.entrySet()) {
+            if (views.has(entry.getKey())) {
+                views.remove(entry.getKey());
+            }
+
+            views.add(entry.getKey(), entry.getValue());
+        }
+        return definition;
+    }
+
+    private JsonObject getViews(String bucketName, String design) throws RestApiException {
+        StringBuilder ub = new StringBuilder()
+                .append('/').append("couchBase/").append(bucketName)
+                .append("/_design/").append(design);
+
+        HttpGet req = new HttpGet();
+        req.setHeader("Content-Type", "application/json");
+
+        try {
+            return getResponseJson(req, ub.toString(), 200).getAsJsonObject();
+        }
+        catch (IOException e) {
+            throw new RestApiException(e);
         }
     }
 }

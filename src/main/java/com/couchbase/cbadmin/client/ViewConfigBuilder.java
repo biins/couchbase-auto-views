@@ -83,8 +83,8 @@ public class ViewConfigBuilder implements ViewConfig {
   }
 
   @Override
-  public String getDefinition() {
-    return jObj.toString();
+  public JsonObject getDefinition() {
+    return jObj;
   }
 
   @Override

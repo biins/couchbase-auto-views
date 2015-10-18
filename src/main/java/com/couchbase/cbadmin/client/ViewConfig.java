@@ -22,6 +22,8 @@
 
 package com.couchbase.cbadmin.client;
 
+import com.google.gson.JsonObject;
+
 import java.util.Collection;
 
 /**
@@ -30,7 +32,7 @@ import java.util.Collection;
  */
 public interface ViewConfig {
   String getDesign();
-  String getDefinition();
+  JsonObject getDefinition();
   String getBucketName();
   String getBucketPassword();
   Collection<String> getViewNames();
