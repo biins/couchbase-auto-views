@@ -1,11 +1,8 @@
 package org.biins.cauchbase;
 
-import com.couchbase.cbadmin.client.BucketConfig;
-import com.couchbase.cbadmin.client.CouchbaseAdmin;
-import com.couchbase.cbadmin.client.RestApiException;
-import com.couchbase.cbadmin.client.ViewConfig;
-import org.biins.cauchbase.builder.BucketBuilder;
-import org.biins.cauchbase.builder.ViewBuilder;
+import com.couchbase.cbadmin.client.*;
+import org.biins.cauchbase.builder.BucketHelper;
+import org.biins.cauchbase.builder.ViewConfigHelper;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -49,115 +46,74 @@ public class AutoViews {
     }
 
     public void setup(Class<?> cls) {
-        Bucket rootBucket = setupClass(cls);
-        setupMethods(cls.getMethods(), rootBucket);
-    }
+        List<Bucket> buckets = new ArrayList<>();
+        List<View> views = new ArrayList<>();
 
-    private Bucket setupClass(Class<?> cls) {
-        Map<Class<?>, List<Annotation>> annotations = annotationsByTypes(cls.getAnnotations());
-
-        List<Bucket> buckets = get(annotations, Bucket.class);
-        if (buckets == null || buckets.size() != 1) {
+        readClass(cls, buckets, views);
+        if (buckets.size() != 1) {
             throw new IllegalStateException("One bucket must be defined");
         }
         Bucket rootBucket = buckets.get(0);
-        List<View> views = get(annotations, View.class);
+        readMethods(cls.getMethods(), rootBucket, views);
 
-        List<BucketConfig> bucketConfigs = createBucketConfigs(buckets);
-        List<ViewConfig> viewConfigs = createViewConfigs(views, rootBucket);
+        createBucket(rootBucket);
+        createViews(views, rootBucket);
 
-        createBuckets(bucketConfigs);
-        createViews(viewConfigs);
-
-        return rootBucket;
     }
 
-    private List<BucketConfig> createBucketConfigs(List<Bucket> bucket) {
-        List<BucketConfig> bucketConfigs = new ArrayList<>();
-        if (bucket != null) {
-            for (Bucket b : bucket) {
-                BucketBuilder bucketBuilder = new BucketBuilder();
-                BucketConfig config = bucketBuilder.build(b, bucketPasswords.get(b.name()));
-                bucketConfigs.add(config);
-            }
-        }
-
-        return bucketConfigs;
+    private void readClass(Class<?> cls, List<Bucket> buckets, List<View> views) {
+        Map<Class<?>, List<Annotation>> annotations = annotationsByTypes(cls.getAnnotations());
+        buckets.addAll(get(annotations, Bucket.class));
+        views.addAll(get(annotations, View.class));
     }
 
-    private List<ViewConfig> createViewConfigs(List<View> view, Bucket rootBucket) {
-        List<ViewConfig> viewConfigs = new ArrayList<>();
-        if (view != null) {
-            for (View v : view) {
-                viewConfigs.add(createViewConfig(v, rootBucket));
-            }
-        }
-        return viewConfigs;
+    private BucketConfig createBucketConfig(Bucket bucket) {
+        return BucketHelper.build(bucket, bucketPasswords.get(bucket.name()));
     }
 
-    private ViewConfig createViewConfig(View v, Bucket rootBucket) {
-        String bucketName = resolveBucketName(v, rootBucket);
-        String designName = resolveDesignName(v, rootBucket);
-        ViewBuilder viewBuilder = new ViewBuilder();
-        return viewBuilder.build(v, designName, bucketName, bucketPasswords.get(bucketName));
+    private String resolveDesignName(Bucket bucket) {
+        return developmentViews ? "dev_" + bucket.design() : bucket.design();
     }
 
-    private String resolveDesignName(View v, Bucket bucket) {
-        if (!v.design().isEmpty()) {
-            return developmentViews ? "dev_" + v.design() : v.design();
-        }
-        else {
-            return developmentViews ? "dev_" + bucket.design() : bucket.design();
-        }
-    }
-
-    private String resolveBucketName(View v, Bucket bucket) {
-        if (!v.bucket().isEmpty()) {
-            return v.bucket();
-        }
-        else {
-            return bucket.name();
-        }
-    }
-
-    private void setupMethods(Method[] methods, Bucket rootBucket) {
+    private void readMethods(Method[] methods, Bucket rootBucket, List<View> views) {
         for (Method method : methods) {
-            setupMethod(method, rootBucket);
+            readMethod(method, rootBucket, views);
         }
     }
 
-    private void setupMethod(Method method, Bucket rootBucket) {
-        List<ViewConfig> viewConfigs = new ArrayList<>();
-        List<View> views = annotationsByType(View.class, method.getAnnotations());
-        for (View v : views) {
-            ViewConfig viewConfig = createViewConfig(v, rootBucket);
-            viewConfigs.add(viewConfig);
-        }
-
-        createViews(viewConfigs);
+    private void readMethod(Method method, Bucket rootBucket, List<View> views) {
+        views.addAll(annotationsByType(View.class, method.getAnnotations()));
     }
 
-    public void createBuckets(List<BucketConfig> bucketConfigs) {
-        for (BucketConfig bucketConfig : bucketConfigs) {
-            try {
-                if (!client.getBuckets().containsKey(bucketConfig.name)) {
-                    client.createBucket(bucketConfig);
-                }
-            }
-            catch (RestApiException e) {
-                throw new RuntimeException(e);
+    public void createBucket(Bucket bucket) {
+        BucketConfig bucketConfig = createBucketConfig(bucket);
+        try {
+            if (!client.getBuckets().containsKey(bucketConfig.name)) {
+                client.createBucket(bucketConfig);
             }
         }
+        catch (RestApiException e) {
+            throw new RuntimeException(e);
+        }
+
     }
 
-    public void createViews(List<ViewConfig> viewConfigs) {
-        for (ViewConfig viewConfig : viewConfigs) {
-            try {
-                client.defineView(viewConfig, pollTimeout);
+    public void createViews(List<View> views, Bucket rootBucket) {
+        ViewConfigBuilder builder = null;
+        for (View view : views) {
+            if (builder == null) {
+                builder = ViewConfigHelper.create(resolveDesignName(rootBucket), rootBucket.name(), bucketPasswords.get(rootBucket.name()));
             }
-            catch (RestApiException e) {
-                throw new RuntimeException(e);
+
+            ViewConfigHelper.addView(builder, view);
+        }
+        try {
+            if (builder != null) {
+                client.defineView(builder.build(), pollTimeout);
             }
+        }
+        catch (RestApiException e) {
+            throw new RuntimeException(e);
         }
     }
 }

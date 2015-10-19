@@ -6,13 +6,13 @@ import org.biins.cauchbase.Bucket;
 /**
  * @author Martin Janys
  */
-public class BucketBuilder {
+public class BucketHelper {
 
-    public BucketConfig build(Bucket bucket) {
+    public static BucketConfig build(Bucket bucket) {
         return build(bucket, null);
     }
 
-    public BucketConfig build(Bucket bucket, String password) {
+    public static BucketConfig build(Bucket bucket, String password) {
         BucketConfig bucketConfig = new BucketConfig(bucket.name());
 
         if (password != null) {

@@ -16,8 +16,4 @@ public @interface View {
 
     String reduce() default "";
 
-    String design() default "";
-
-    String bucket() default "";
-
 }
