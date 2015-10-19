@@ -40,6 +40,10 @@ public class AutoViews {
         this.developmentViews = developmentViews;
     }
 
+    public boolean isDevelopmentViews() {
+        return developmentViews;
+    }
+
     public void setup(Object object) {
         Class<?> cls = object.getClass();
         setup(cls);

@@ -849,7 +849,7 @@ public class CouchbaseAdminImpl implements CouchbaseAdmin {
 
     private JsonObject mergeViews(JsonObject design, JsonObject definition) {
         JsonObject views = definition.get("views").getAsJsonObject();
-        JsonObject currentViews = design.get("views").getAsJsonObject();
+        JsonObject currentViews = design != null ? design.get("views").getAsJsonObject() : new JsonObject();
         for (Entry<String, JsonElement> entry : currentViews.entrySet()) {
             if (views.has(entry.getKey())) {
                 views.remove(entry.getKey());
@@ -870,6 +870,14 @@ public class CouchbaseAdminImpl implements CouchbaseAdmin {
 
         try {
             return getResponseJson(req, ub.toString(), 200).getAsJsonObject();
+        }
+        catch (RestApiException e) {
+            if (e.getStatusLine().getStatusCode() == 404) {
+                return null;
+            }
+            else {
+                throw e;
+            }
         }
         catch (IOException e) {
             throw new RestApiException(e);
