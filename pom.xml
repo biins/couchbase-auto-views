@@ -32,7 +32,7 @@
             <email>martinjanys@gmail.com</email>
         </developer>
     </developers>
-    
+
     <dependencyManagement>
         <dependencies>
             <dependency>
